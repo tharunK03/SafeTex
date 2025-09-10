@@ -128,7 +128,7 @@ app.use('*', (req, res) => {
 app.use(errorHandler)
 
 // Start server
-app.listen(PORT, 'localhost', () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Saft ERP API server running on port ${PORT}`)
   console.log(`📊 Environment: ${process.env.NODE_ENV}`)
   console.log(`🔗 Health check: http://localhost:${PORT}/health`)
