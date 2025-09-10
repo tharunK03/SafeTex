@@ -1,0 +1,174 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Create Firebase Test Users</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 800px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 12px 24px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 0;
+        }
+        button:hover {
+            background: #2563eb;
+        }
+        button:disabled {
+            background: #9ca3af;
+            cursor: not-allowed;
+        }
+        .output {
+            background: #f3f4f6;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            padding: 15px;
+            margin: 20px 0;
+            font-family: monospace;
+            white-space: pre-wrap;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        .success { color: #059669; }
+        .error { color: #dc2626; }
+        .warning { color: #d97706; }
+        .info { color: #3b82f6; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔥 Firebase Test User Creator</h1>
+        <p>This tool will create test users in your Firebase project for the Saft ERP application.</p>
+        
+        <div>
+            <button id="createUsers" onclick="createTestUsers()">Create Test Users</button>
+            <button onclick="clearOutput()">Clear Output</button>
+        </div>
+        
+        <div id="output" class="output">Click "Create Test Users" to start...</div>
+        
+        <h3>Test Users to be Created:</h3>
+        <ul>
+            <li><strong>Admin:</strong> admin@saft.com / admin123</li>
+            <li><strong>Production Manager:</strong> production@saft.com / production123</li>
+            <li><strong>Sales:</strong> sales@saft.com / sales123</li>
+        </ul>
+        
+        <h3>After creating users:</h3>
+        <ol>
+            <li>Go to your Saft ERP login page</li>
+            <li>Use any of the credentials above</li>
+            <li>You should be able to log in successfully</li>
+        </ol>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js';
+        import { getAuth, createUserWithEmailAndPassword, updateProfile } from 'https://www.gstatic.com/firebasejs/10.7.1/firebase-auth.js';
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyBESxiYBuyIR9g7vmW4tFByc3q8QkCgsJk",
+            authDomain: "safetex-749f9.firebaseapp.com",
+            projectId: "safetex-749f9",
+            storageBucket: "safetex-749f9.appspot.com",
+            messagingSenderId: "811178603279",
+            appId: "1:811178603279:web:27fbfb2e0d23a8b7ac847a"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+
+        const testUsers = [
+            {
+                email: 'admin@saft.com',
+                password: 'admin123',
+                displayName: 'System Administrator'
+            },
+            {
+                email: 'production@saft.com',
+                password: 'production123',
+                displayName: 'Production Manager'
+            },
+            {
+                email: 'sales@saft.com',
+                password: 'sales123',
+                displayName: 'Sales Representative'
+            }
+        ];
+
+        window.createTestUsers = async function() {
+            const button = document.getElementById('createUsers');
+            const output = document.getElementById('output');
+            
+            button.disabled = true;
+            button.textContent = 'Creating Users...';
+            output.textContent = '🚀 Starting user creation process...\n';
+            
+            for (const user of testUsers) {
+                try {
+                    output.textContent += `\n📝 Creating user: ${user.email}...\n`;
+                    
+                    const userCredential = await createUserWithEmailAndPassword(
+                        auth,
+                        user.email,
+                        user.password
+                    );
+                    
+                    await updateProfile(userCredential.user, {
+                        displayName: user.displayName
+                    });
+                    
+                    output.textContent += `✅ Successfully created: ${user.email} (${user.displayName})\n`;
+                } catch (error) {
+                    if (error.code === 'auth/email-already-in-use') {
+                        output.textContent += `⚠️ User already exists: ${user.email}\n`;
+                    } else {
+                        output.textContent += `❌ Error creating ${user.email}: ${error.message}\n`;
+                    }
+                }
+            }
+            
+            output.textContent += '\n🎉 User creation process completed!\n';
+            output.textContent += '\n📋 Login Credentials:\n';
+            testUsers.forEach(user => {
+                output.textContent += `${user.displayName}: ${user.email} / ${user.password}\n`;
+            });
+            
+            button.disabled = false;
+            button.textContent = 'Create Test Users';
+        };
+
+        window.clearOutput = function() {
+            document.getElementById('output').textContent = 'Output cleared...';
+        };
+    </script>
+</body>
+</html>
+
+
+
+
+
+
+
+
+
+
+
