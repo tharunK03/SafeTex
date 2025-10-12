@@ -24,10 +24,8 @@ try {
   console.error('❌ Invalid Supabase URL format')
 }
 
-// Validate API key format (should be a JWT-like string)
-const isValidKey = typeof supabaseKey === 'string' && 
-                  supabaseKey.split('.').length === 3 && 
-                  supabaseKey.length > 50
+// Validate API key format - just check if it's a non-empty string for now
+const isValidKey = typeof supabaseKey === 'string' && supabaseKey.length > 0
 
 console.log('Validation results:', {
   SUPABASE_URL: {
@@ -48,43 +46,71 @@ console.log('Validation results:', {
   }
 })
 
-if (!isValidUrl || !isValidKey || !databaseUrl) {
-  console.error('❌ Invalid configuration:')
-  if (!isValidUrl) console.error('- Supabase URL is not a valid URL')
-  if (!isValidKey) console.error('- Supabase key is not in correct format')
-  if (!databaseUrl) console.error('- Database URL is missing')
-  
-  if (process.env.NODE_ENV === 'production') {
-    console.error('⚠️ Production environment detected. Service may not work correctly!')
-  } else {
-    process.exit(1)
-  }
+// Log warnings for invalid configuration but don't block initialization
+if (!isValidUrl) console.warn('⚠️ Warning: Supabase URL format seems invalid')
+if (!isValidKey) console.warn('⚠️ Warning: Supabase key seems invalid')
+if (!databaseUrl) console.warn('⚠️ Warning: Database URL is missing')
+
+// Always try to initialize in production, but exit in development if config is invalid
+if (process.env.NODE_ENV !== 'production' && (!supabaseUrl || !supabaseKey)) {
+  console.error('❌ Missing required Supabase configuration in development mode')
+  process.exit(1)
 }
 
 // Supabase client for real-time features and auth
-console.log('🔄 Initializing Supabase client...')
+console.log('🔄 Initializing Supabase client with:', {
+  url: supabaseUrl ? `${supabaseUrl.substring(0, 8)}...` : 'undefined',
+  keyLength: supabaseKey?.length || 0
+})
 
 // Create Supabase client with error handling
 let supabase
 try {
-  supabase = createClient(supabaseUrl, supabaseKey, {
+  const options = {
     auth: {
       autoRefreshToken: true,
       persistSession: true
+    },
+    global: {
+      headers: { 'x-client-info': 'saft-erp-backend' }
     }
-  })
+  }
+
+  if (!supabaseUrl || !supabaseKey) {
+    throw new Error('Missing Supabase credentials')
+  }
+
+  supabase = createClient(supabaseUrl, supabaseKey, options)
   
-  // Test the connection
+  // Test the connection immediately
   ;(async () => {
     try {
-      const { data, error } = await supabase.from('products').select('id').limit(1)
-      if (error) throw error
-      console.log('✅ Supabase connection test successful')
+      console.log('🔄 Testing Supabase connection...')
+      const { error } = await supabase.auth.getSession()
+      
+      if (error) {
+        console.error('❌ Supabase auth check failed:', {
+          message: error.message,
+          status: error.status
+        })
+      } else {
+        console.log('✅ Supabase auth check successful')
+        // Try a simple database query
+        const { error: dbError } = await supabase.from('products').select('id').limit(1)
+        if (dbError) {
+          console.error('❌ Supabase database check failed:', {
+            message: dbError.message,
+            hint: dbError.hint,
+            code: dbError.code
+          })
+        } else {
+          console.log('✅ Supabase database check successful')
+        }
+      }
     } catch (error) {
       console.error('❌ Supabase connection test failed:', {
         message: error.message,
-        hint: error.hint,
-        details: error.details
+        name: error.name
       })
     }
   })()
