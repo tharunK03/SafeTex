@@ -29,10 +29,9 @@ const initializeFirebase = () => {
         databaseURL: `https://${process.env.FIREBASE_PROJECT_ID}.firebaseio.com`
       })
     } else {
-      // For development, you can use the default credentials
-      // Make sure to set GOOGLE_APPLICATION_CREDENTIALS environment variable
+      // For development, use default credentials with explicit project ID
       admin.initializeApp({
-        projectId: process.env.FIREBASE_PROJECT_ID
+        projectId: process.env.FIREBASE_PROJECT_ID || 'safetex-749f9'
       })
     }
 

@@ -30,8 +30,13 @@ const ProtectedLayout = ({ children }) => {
 
   const handleLogout = async () => {
     try {
-      await signOut(auth)
+      // Clear stored token
+      localStorage.removeItem('auth_token')
+      
+      // Clear Redux state
       dispatch(logout())
+      
+      // Navigate to login
       navigate('/login')
     } catch (error) {
       console.error('Error signing out:', error)

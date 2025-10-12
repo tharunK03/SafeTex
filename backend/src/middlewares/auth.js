@@ -1,4 +1,5 @@
-const { getAuth } = require('../config/firebase')
+const { supabase } = require('../config/supabase')
+const { verifyDemoToken, DEMO_USERS } = require('../../demo-auth-bypass')
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -20,44 +21,52 @@ const authMiddleware = async (req, res, next) => {
       })
     }
 
-    // Verify the Firebase ID token
-    const auth = getAuth()
-    const decodedToken = await auth.verifyIdToken(token)
+    // Check if it's a demo token first
+    const demoUser = verifyDemoToken(token)
+    if (demoUser) {
+      req.user = {
+        id: demoUser.id,
+        uid: demoUser.id, // For compatibility
+        email: demoUser.email,
+        emailVerified: true,
+        name: demoUser.user_metadata?.full_name || demoUser.email,
+        picture: null,
+        role: demoUser.user_metadata?.role || 'user'
+      }
+      return next()
+    }
+
+    // Verify the Supabase JWT token
+    const { data: { user }, error } = await supabase.auth.getUser(token)
     
+    if (error || !user) {
+      return res.status(401).json({
+        error: 'Unauthorized',
+        message: 'Invalid token'
+      })
+    }
+
     // Get user role from database
-    const db = require('../services/database')
-    const user = await db.getOne(
-      'SELECT role FROM users WHERE firebase_uid = $1',
-      [decodedToken.uid]
-    )
+    const { data: userData, error: userError } = await supabase
+      .from('users')
+      .select('role, display_name')
+      .eq('id', user.id)
+      .single()
 
     // Add user info to request object
     req.user = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      emailVerified: decodedToken.email_verified,
-      name: decodedToken.name || decodedToken.email,
-      picture: decodedToken.picture,
-      role: user?.role || 'user' // Get role from database, default to 'user'
+      id: user.id,
+      uid: user.id, // For compatibility
+      email: user.email,
+      emailVerified: user.email_confirmed_at ? true : false,
+      name: userData?.display_name || user.user_metadata?.full_name || user.email,
+      picture: user.user_metadata?.avatar_url,
+      role: userData?.role || 'user' // Get role from database, default to 'user'
     }
 
     next()
   } catch (error) {
     console.error('Auth middleware error:', error)
-    
-    if (error.code === 'auth/id-token-expired') {
-      return res.status(401).json({
-        error: 'Token expired',
-        message: 'Your session has expired. Please log in again.'
-      })
-    }
-    
-    if (error.code === 'auth/id-token-revoked') {
-      return res.status(401).json({
-        error: 'Token revoked',
-        message: 'Your session has been revoked. Please log in again.'
-      })
-    }
     
     return res.status(401).json({
       error: 'Unauthorized',

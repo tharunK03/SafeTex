@@ -105,7 +105,10 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // Static file serving for PDFs
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
-// Root route handler
+// Serve static files for frontend
+app.use(express.static(path.join(__dirname, '../../frontend/dist')))
+
+// API routes handler for root path
 app.get('/', (req, res) => {
   res.status(200).json({
     name: 'Saft ERP API',
@@ -151,12 +154,17 @@ app.use('/api/invoices', authMiddleware, invoiceRoutes)
 app.use('/api/reports', authMiddleware, reportRoutes)
 app.use('/api/stats', authMiddleware, statsRoutes)
 
-// 404 handler
-app.use('*', (req, res) => {
-  res.status(404).json({ 
-    error: 'Route not found',
-    message: `Cannot ${req.method} ${req.originalUrl}`
-  })
+// Handle frontend routes
+app.get('*', (req, res) => {
+  // If the request starts with /api, return 404 JSON response
+  if (req.url.startsWith('/api')) {
+    return res.status(404).json({ 
+      error: 'Route not found',
+      message: `Cannot ${req.method} ${req.originalUrl}`
+    });
+  }
+  // Otherwise serve the frontend index.html
+  res.sendFile(path.join(__dirname, '../../frontend/dist/index.html'));
 })
 
 // Error handling middleware

@@ -102,20 +102,55 @@ router.post('/', [
 
     const { customerId, items, notes } = req.body
     
-    // Generate order number in SAFT-00001 format
-    const { data: lastOrder, error: countError } = await supabase
-      .from('orders')
-      .select('order_number')
-      .order('created_at', { ascending: false })
-      .limit(1)
+    // Generate unique order number in SAFT-00001 format
+    let orderNumber
+    let attempts = 0
+    const maxAttempts = 10
     
-    let orderNumber = 'SAFT-00001'
-    if (lastOrder && lastOrder.length > 0) {
-      const lastNumber = lastOrder[0].order_number
-      if (lastNumber && lastNumber.startsWith('SAFT-')) {
+    do {
+      // Get the highest order number
+      const { data: lastOrder, error: countError } = await supabase
+        .from('orders')
+        .select('order_number')
+        .like('order_number', 'SAFT-%')
+        .order('order_number', { ascending: false })
+        .limit(1)
+      
+      if (countError) {
+        console.error('Error fetching last order:', countError)
+        return res.status(500).json({
+          success: false,
+          error: 'Failed to generate order number'
+        })
+      }
+      
+      if (lastOrder && lastOrder.length > 0) {
+        const lastNumber = lastOrder[0].order_number
         const numberPart = parseInt(lastNumber.replace('SAFT-', ''))
         orderNumber = `SAFT-${String(numberPart + 1).padStart(5, '0')}`
+      } else {
+        orderNumber = 'SAFT-00001'
       }
+      
+      // Check if this order number already exists
+      const { data: existingOrder } = await supabase
+        .from('orders')
+        .select('id')
+        .eq('order_number', orderNumber)
+        .limit(1)
+      
+      if (!existingOrder || existingOrder.length === 0) {
+        break // Order number is unique
+      }
+      
+      attempts++
+    } while (attempts < maxAttempts)
+    
+    if (attempts >= maxAttempts) {
+      return res.status(500).json({
+        success: false,
+        error: 'Failed to generate unique order number'
+      })
     }
     
     // Calculate total amount

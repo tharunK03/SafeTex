@@ -1,6 +1,6 @@
 const express = require('express')
 const { body, validationResult } = require('express-validator')
-const db = require('../services/database')
+const { supabase } = require('../config/supabase')
 const { requirePermission, requireRole, ROLES, getAllRoles } = require('../config/roles')
 
 const router = express.Router()
@@ -38,71 +38,62 @@ router.get('/', requireRole([ROLES.ADMIN]), async (req, res) => {
 })
 
 // @route   GET /api/users/me
-// @desc    Get current user profile (create if doesn't exist)
+// @desc    Get current user profile
 // @access  Private
 router.get('/me', async (req, res) => {
   try {
-    const firebase_uid = req.user.uid
-    const firebase_email = req.user.email
-    const firebase_display_name = req.user.name
+    const user_id = req.user.id
+    const user_email = req.user.email
+    const user_display_name = req.user.name
+    const user_role = req.user.role
 
-    // Try to get existing user
-    let user = await db.getOne(`
-      SELECT 
-        id,
-        firebase_uid,
-        email,
-        display_name,
-        role,
-        created_at,
-        updated_at
-      FROM users
-      WHERE firebase_uid = $1
-    `, [firebase_uid])
-
-    // If user doesn't exist, check if there's a user with the same email
-    if (!user) {
-      console.log(`User not found with firebase_uid: ${firebase_uid}`)
-      
-      // Check if there's an existing user with the same email
-      const existingUserByEmail = await db.getOne(
-        'SELECT * FROM users WHERE email = $1',
-        [firebase_email]
-      )
-      
-      if (existingUserByEmail) {
-        // Update the existing user with the new firebase_uid
-        console.log(`Found existing user with email ${firebase_email}, updating firebase_uid`)
-        user = await db.update(`
-          UPDATE users 
-          SET firebase_uid = $1, updated_at = CURRENT_TIMESTAMP
-          WHERE email = $2
-          RETURNING *
-        `, [firebase_uid, firebase_email])
-        
-        console.log(`Updated existing user with role: ${user.role}`)
-      } else {
-        // Create new user with role based on email
-        console.log(`Creating new user: ${firebase_email} with firebase_uid: ${firebase_uid}`)
-        
-        // Determine default role based on email (for testing purposes)
-        let defaultRole = 'user'
-        if (firebase_email === 'admin@saft.com') {
-          defaultRole = 'admin'
-        } else if (firebase_email === 'sales@saft.com') {
-          defaultRole = 'sales'
-        } else if (firebase_email === 'production@saft.com') {
-          defaultRole = 'production_manager'
+    // For demo users, return the user info directly
+    if (user_id.startsWith('demo-')) {
+      return res.json({
+        success: true,
+        data: {
+          id: user_id,
+          email: user_email,
+          display_name: user_display_name,
+          role: user_role,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
         }
+      })
+    }
 
-        user = await db.insert(`
-          INSERT INTO users (firebase_uid, email, display_name, role)
-          VALUES ($1, $2, $3, $4)
-          RETURNING *
-        `, [firebase_uid, firebase_email, firebase_display_name, defaultRole])
+    // For real Supabase users, try to get from database
+    const { data: user, error } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', user_id)
+      .single()
 
-        console.log(`Created new user with role: ${defaultRole}`)
+    if (error && error.code !== 'PGRST116') {
+      throw error
+    }
+
+    if (!user) {
+      // Create new user in database
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: user_id,
+          email: user_email,
+          display_name: user_display_name,
+          role: user_role || 'user'
+        })
+        .select()
+        .single()
+
+      if (createError) {
+        throw createError
       }
+
+      return res.json({
+        success: true,
+        data: newUser
+      })
     }
 
     res.json({

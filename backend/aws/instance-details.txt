@@ -1,0 +1,3 @@
+13.233.109.196
+Instance IP: 13.233.109.196
+Key File: /Users/tharun/Downloads/safe.pem
