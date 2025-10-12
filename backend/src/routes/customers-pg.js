@@ -26,10 +26,16 @@ router.get('/', requirePermission('customers', 'read'), async (req, res) => {
       count: customers.length
     })
   } catch (error) {
-    console.error('Error fetching customers:', error)
+    console.error('Error fetching customers:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail,
+      stack: error.stack
+    })
     res.status(500).json({
       success: false,
-      error: 'Failed to fetch customers'
+      error: 'Failed to fetch customers',
+      detail: process.env.NODE_ENV === 'development' ? error.message : undefined
     })
   }
 })

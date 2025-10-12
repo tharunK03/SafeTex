@@ -28,6 +28,10 @@ const getPoolConfig = () => {
   const baseConfig = {
     connectionString: process.env.DATABASE_URL,
     ssl: { rejectUnauthorized: false },
+    statement_timeout: 10000, // 10 seconds
+    query_timeout: 10000,     // 10 seconds
+    connectionTimeoutMillis: 10000,
+    idleTimeoutMillis: 5000
   }
 
   // Platform detection
@@ -37,15 +41,12 @@ const getPoolConfig = () => {
       ...baseConfig,
       max: 1,
       idleTimeoutMillis: 0,
-      connectionTimeoutMillis: 10000,
     }
   } else if (process.env.RAILWAY_ENVIRONMENT) {
     // Railway
     return {
       ...baseConfig,
       max: 5,
-      idleTimeoutMillis: 5000,
-      connectionTimeoutMillis: 3000,
     }
   } else if (process.env.RENDER) {
     // Render - Force IPv4 and increase timeouts
@@ -71,43 +72,29 @@ const getPoolConfig = () => {
 const pool = new Pool(getPoolConfig())
 
 // Enhanced connection test with retry logic
-const testConnection = async (retries = 5) => {
-  console.log(`🔄 Testing database connection with ${retries} retries...`)
-  console.log(`📡 Database URL: ${databaseUrl.replace(/:[^:@]+@/, ':****@')}`)
-  
-  for (let i = 0; i < retries; i++) {
-    try {
-      console.log(`🔄 Connection attempt ${i + 1}/${retries}...`)
-      const client = await pool.connect()
-      const result = await client.query('SELECT NOW()')
-      console.log('✅ PostgreSQL database connected successfully')
-      console.log(`📊 Database time: ${result.rows[0].now}`)
-      client.release()
-      return true
-    } catch (error) {
-      console.error(`❌ PostgreSQL connection attempt ${i + 1} failed:`)
-      console.error(`   Error: ${error.message}`)
-      console.error(`   Code: ${error.code || 'N/A'}`)
-      console.error(`   Detail: ${error.detail || 'N/A'}`)
-      
-      if (i === retries - 1) {
-        console.error('❌ All connection attempts failed')
-        console.error('🔧 Troubleshooting tips:')
-        console.error('   - Check if DATABASE_URL is correctly set in Render')
-        console.error('   - Verify Supabase project is active and accessible')
-        console.error('   - Check if your Supabase project allows external connections')
-        console.error('   - Try restarting the Supabase project')
-        return false
-      }
-      
-      // Exponential backoff for retries
-      const delay = Math.pow(2, i) * 1000
-      console.log(`⏳ Waiting ${delay}ms before retry...`)
-      await new Promise(resolve => setTimeout(resolve, delay))
-    }
+// Test database connection
+const testConnection = async () => {
+  const pool = new Pool(getPoolConfig())
+  try {
+    console.log('🔄 Testing database connection...')
+    console.log('� Database URL:', process.env.DATABASE_URL?.replace(/:[^:@]+@/, ':****@'))
+    console.log('🌐 Supabase URL:', process.env.SUPABASE_URL)
+    
+    const client = await pool.connect()
+    const result = await client.query('SELECT NOW()')
+    console.log('✅ Database connection successful:', result.rows[0])
+    client.release()
+    return true
+  } catch (error) {
+    console.error('❌ Database connection error:', {
+      message: error.message,
+      code: error.code,
+      detail: error.detail
+    })
+    return false
+  } finally {
+    await pool.end().catch(err => console.error('Pool end error:', err))
   }
-  return false
-}
 
 // Initialize database tables
 const initializeDatabase = async () => {
