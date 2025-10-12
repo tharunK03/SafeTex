@@ -22,7 +22,8 @@ export const getApiBaseUrl = () => {
       return 'http://localhost:5000'
     }
 
-    if (hostname === 'safetexenterprises.vercel.app') {
+    if (hostname === 'safetexenterprises.vercel.app' || 
+        hostname === 'safe-tex-tharuns-projects-7933d4cd.vercel.app') {
       return DEFAULT_BACKEND_URL
     }
   }
