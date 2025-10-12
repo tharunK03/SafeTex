@@ -9,13 +9,15 @@ const rateLimit = require('express-rate-limit')
 const path = require('path')
 const dotenv = require('dotenv')
 
-// Configure dotenv
-const dotenvResult = dotenv.config()
-if (dotenvResult.error) {
-  console.error('❌ Error loading .env file:', dotenvResult.error)
-  process.exit(1)
+// Configure dotenv (only in development)
+if (process.env.NODE_ENV !== 'production') {
+  const dotenvResult = dotenv.config()
+  if (dotenvResult.error) {
+    console.warn('⚠️ No .env file found. Using environment variables.')
+  }
 }
 
+// In production, we use Render's environment variables directly
 const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DATABASE_URL']
 const missingEnv = requiredEnv.filter((key) => !process.env[key])
 if (missingEnv.length > 0) {

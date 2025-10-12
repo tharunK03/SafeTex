@@ -3,8 +3,8 @@ services:
     name: saft-erp-backend
     env: node
     plan: free
-    buildCommand: npm ci --omit=dev --no-audit
-    startCommand: node --max-old-space-size=512 src/index.js
+    buildCommand: cd backend && npm ci --omit=dev --no-audit
+    startCommand: cd backend && NODE_ENV=production node --max-old-space-size=512 src/index.js
     healthCheckPath: /health
     autoDeploy: true
     envVars:
