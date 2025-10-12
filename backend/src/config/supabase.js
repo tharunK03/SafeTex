@@ -1,32 +1,112 @@
 const { createClient } = require('@supabase/supabase-js')
 const { Pool } = require('pg')
 
-// Supabase client for real-time features and auth
+// Force IPv4 for better connectivity on some platforms
+const dns = require('dns')
+try { 
+  dns.setDefaultResultOrder('ipv4first') 
+} catch (_) {}
+
+// Validate required environment variables
 const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_ANON_KEY
+const databaseUrl = process.env.DATABASE_URL
 
+if (!supabaseUrl || !supabaseKey || !databaseUrl) {
+  console.error('❌ Missing required environment variables:')
+  console.error('SUPABASE_URL:', supabaseUrl ? '✅' : '❌')
+  console.error('SUPABASE_ANON_KEY:', supabaseKey ? '✅' : '❌')
+  console.error('DATABASE_URL:', databaseUrl ? '✅' : '❌')
+  process.exit(1)
+}
+
+// Supabase client for real-time features and auth
 const supabase = createClient(supabaseUrl, supabaseKey)
 
-// PostgreSQL connection pool for direct database access
-const pool = new Pool({
-  connectionString: process.env.DATABASE_URL,
-  ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-  max: 20, // Maximum number of clients in the pool
-  idleTimeoutMillis: 30000, // Close idle clients after 30 seconds
-  connectionTimeoutMillis: 2000, // Return an error after 2 seconds if connection could not be established
-})
-
-// Test database connection
-const testConnection = async () => {
-  try {
-    const client = await pool.connect()
-    console.log('✅ PostgreSQL database connected successfully')
-    client.release()
-    return true
-  } catch (error) {
-    console.error('❌ PostgreSQL connection error:', error.message)
-    return false
+// Platform-specific connection pool configuration
+const getPoolConfig = () => {
+  const baseConfig = {
+    connectionString: process.env.DATABASE_URL,
+    ssl: { rejectUnauthorized: false },
   }
+
+  // Platform detection
+  if (process.env.VERCEL) {
+    // Vercel serverless
+    return {
+      ...baseConfig,
+      max: 1,
+      idleTimeoutMillis: 0,
+      connectionTimeoutMillis: 10000,
+    }
+  } else if (process.env.RAILWAY_ENVIRONMENT) {
+    // Railway
+    return {
+      ...baseConfig,
+      max: 5,
+      idleTimeoutMillis: 5000,
+      connectionTimeoutMillis: 3000,
+    }
+  } else if (process.env.RENDER) {
+    // Render - Force IPv4 and increase timeouts
+    return {
+      ...baseConfig,
+      max: 10,
+      idleTimeoutMillis: 10000,
+      connectionTimeoutMillis: 30000,
+      host: process.env.DATABASE_HOST || undefined,
+      port: process.env.DATABASE_PORT || undefined,
+    }
+  } else {
+    // Default (Heroku, local development)
+    return {
+      ...baseConfig,
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    }
+  }
+}
+
+const pool = new Pool(getPoolConfig())
+
+// Enhanced connection test with retry logic
+const testConnection = async (retries = 5) => {
+  console.log(`🔄 Testing database connection with ${retries} retries...`)
+  console.log(`📡 Database URL: ${databaseUrl.replace(/:[^:@]+@/, ':****@')}`)
+  
+  for (let i = 0; i < retries; i++) {
+    try {
+      console.log(`🔄 Connection attempt ${i + 1}/${retries}...`)
+      const client = await pool.connect()
+      const result = await client.query('SELECT NOW()')
+      console.log('✅ PostgreSQL database connected successfully')
+      console.log(`📊 Database time: ${result.rows[0].now}`)
+      client.release()
+      return true
+    } catch (error) {
+      console.error(`❌ PostgreSQL connection attempt ${i + 1} failed:`)
+      console.error(`   Error: ${error.message}`)
+      console.error(`   Code: ${error.code || 'N/A'}`)
+      console.error(`   Detail: ${error.detail || 'N/A'}`)
+      
+      if (i === retries - 1) {
+        console.error('❌ All connection attempts failed')
+        console.error('🔧 Troubleshooting tips:')
+        console.error('   - Check if DATABASE_URL is correctly set in Render')
+        console.error('   - Verify Supabase project is active and accessible')
+        console.error('   - Check if your Supabase project allows external connections')
+        console.error('   - Try restarting the Supabase project')
+        return false
+      }
+      
+      // Exponential backoff for retries
+      const delay = Math.pow(2, i) * 1000
+      console.log(`⏳ Waiting ${delay}ms before retry...`)
+      await new Promise(resolve => setTimeout(resolve, delay))
+    }
+  }
+  return false
 }
 
 // Initialize database tables
@@ -272,7 +352,7 @@ const initializeDatabase = async () => {
       console.error('Error checking production_logs table:', error)
     }
 
-    // Create raw_materials table using direct SQL
+    // Create raw_materials table
     try {
       const { error: rawMaterialsError } = await supabase
         .from('raw_materials')
@@ -280,13 +360,12 @@ const initializeDatabase = async () => {
         .limit(1)
       
       if (rawMaterialsError && rawMaterialsError.code === 'PGRST116') {
-        // Table doesn't exist, create it manually
+        // Table doesn't exist, create it
         console.log('Creating raw_materials table...')
-        // Note: In a real production environment, you would use migrations
-        // For now, we'll create the table manually in Supabase dashboard
-        console.log('⚠️  Please create the raw_materials table manually in Supabase dashboard with the following SQL:')
-        console.log(`
-          CREATE TABLE raw_materials (
+        
+        // Create raw_materials table
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS raw_materials (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             name VARCHAR(255) NOT NULL,
             description TEXT,
@@ -295,20 +374,32 @@ const initializeDatabase = async () => {
             min_stock_level DECIMAL(10,2) NOT NULL DEFAULT 0,
             cost_per_unit DECIMAL(10,2) NOT NULL DEFAULT 0,
             supplier VARCHAR(255),
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'discontinued')),
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
           );
+          
+          CREATE INDEX IF NOT EXISTS idx_raw_materials_name ON raw_materials(name);
+          CREATE INDEX IF NOT EXISTS idx_raw_materials_supplier ON raw_materials(supplier);
+          CREATE INDEX IF NOT EXISTS idx_raw_materials_status ON raw_materials(status);
           
           ALTER TABLE raw_materials ENABLE ROW LEVEL SECURITY;
           
-          CREATE POLICY "Allow all operations for raw_materials" ON raw_materials
+          DROP POLICY IF EXISTS "Authenticated users can view raw materials" ON raw_materials;
+          CREATE POLICY "Authenticated users can view raw materials" ON raw_materials
+            FOR SELECT USING (true);
+          
+          DROP POLICY IF EXISTS "Authenticated users can manage raw materials" ON raw_materials;
+          CREATE POLICY "Authenticated users can manage raw materials" ON raw_materials
             FOR ALL USING (true);
         `)
+        
+        console.log('✅ raw_materials table created successfully')
       } else {
         console.log('✅ raw_materials table ready')
       }
     } catch (error) {
-      console.error('Error checking raw_materials table:', error)
+      console.error('Error creating raw_materials table:', error)
     }
 
     // Create production_material_requirements table
@@ -320,28 +411,39 @@ const initializeDatabase = async () => {
       
       if (requirementsError && requirementsError.code === 'PGRST116') {
         console.log('Creating production_material_requirements table...')
-        console.log('⚠️  Please create the production_material_requirements table manually in Supabase dashboard with the following SQL:')
-        console.log(`
-          CREATE TABLE production_material_requirements (
+        
+        await client.query(`
+          CREATE TABLE IF NOT EXISTS production_material_requirements (
             id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
             product_id UUID REFERENCES products(id) ON DELETE CASCADE,
             raw_material_id UUID REFERENCES raw_materials(id) ON DELETE CASCADE,
             quantity_required DECIMAL(10,2) NOT NULL,
             unit VARCHAR(50) NOT NULL,
-            created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-            updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+            created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+            UNIQUE(product_id, raw_material_id)
           );
+          
+          CREATE INDEX IF NOT EXISTS idx_production_material_requirements_product_id ON production_material_requirements(product_id);
+          CREATE INDEX IF NOT EXISTS idx_production_material_requirements_raw_material_id ON production_material_requirements(raw_material_id);
           
           ALTER TABLE production_material_requirements ENABLE ROW LEVEL SECURITY;
           
-          CREATE POLICY "Allow all operations for production_material_requirements" ON production_material_requirements
+          DROP POLICY IF EXISTS "Authenticated users can view production material requirements" ON production_material_requirements;
+          CREATE POLICY "Authenticated users can view production material requirements" ON production_material_requirements
+            FOR SELECT USING (true);
+          
+          DROP POLICY IF EXISTS "Authenticated users can manage production material requirements" ON production_material_requirements;
+          CREATE POLICY "Authenticated users can manage production material requirements" ON production_material_requirements
             FOR ALL USING (true);
         `)
+        
+        console.log('✅ production_material_requirements table created successfully')
       } else {
         console.log('✅ production_material_requirements table ready')
       }
     } catch (error) {
-      console.error('Error checking production_material_requirements table:', error)
+      console.error('Error creating production_material_requirements table:', error)
     }
 
     console.log('✅ Database tables initialized successfully')

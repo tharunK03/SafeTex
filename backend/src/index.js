@@ -1,4 +1,7 @@
 const express = require('express')
+const dns = require('dns')
+// Prefer IPv4 to avoid ENETUNREACH on hosts without IPv6 (e.g., some PaaS egress)
+try { dns.setDefaultResultOrder('ipv4first') } catch (_) {}
 const cors = require('cors')
 const helmet = require('helmet')
 const morgan = require('morgan')
@@ -6,16 +9,12 @@ const rateLimit = require('express-rate-limit')
 const path = require('path')
 require('dotenv').config()
 
-// Initialize Firebase
-const { initializeFirebase } = require('./config/firebase')
-
-// Initialize Supabase PostgreSQL
+// Initialize Supabase
 const { testConnection, initializeDatabase } = require('./config/supabase')
 
 // Import routes
 const authRoutes = require('./routes/auth')
-const customerRoutes = require('./routes/customers')
-const customerPgRoutes = require('./routes/customers-pg')
+const customerRoutes = require('./routes/customers-pg')
 const userRoutes = require('./routes/users')
 const productRoutes = require('./routes/products')
 const orderRoutes = require('./routes/orders')
@@ -32,29 +31,38 @@ const { authMiddleware } = require('./middlewares/auth')
 const app = express()
 const PORT = process.env.PORT || 5000
 
-// Initialize Firebase Admin SDK
-try {
-  initializeFirebase()
-} catch (error) {
-  console.error('Failed to initialize Firebase:', error)
-  process.exit(1)
-}
-
-// Initialize PostgreSQL Database
+// Initialize Supabase Database
 const initializeApp = async () => {
   try {
     // Test database connection
-    const isConnected = await testConnection()
-    if (!isConnected) {
-      console.error('❌ Failed to connect to PostgreSQL database')
-      process.exit(1)
+    const connected = await testConnection()
+    if (!connected) {
+      console.error('❌ Database connection failed')
+      
+      // For Render deployment, try to start the server anyway
+      // Database connection will be retried on first request
+      if (process.env.RENDER) {
+        console.log('⚠️  Starting server in degraded mode - database will be retried on requests')
+        return
+      } else {
+        process.exit(1)
+      }
     }
 
     // Initialize database tables
     await initializeDatabase()
+    console.log('✅ Supabase database initialized successfully')
+    console.log('📊 Using Supabase PostgreSQL as the database')
   } catch (error) {
     console.error('❌ Database initialization failed:', error)
-    process.exit(1)
+    
+    // For Render deployment, try to start the server anyway
+    if (process.env.RENDER) {
+      console.log('⚠️  Starting server in degraded mode - database will be retried on requests')
+      return
+    } else {
+      process.exit(1)
+    }
   }
 }
 
@@ -107,7 +115,6 @@ app.get('/health', (req, res) => {
 app.use('/api/auth', authRoutes)
 app.use('/api/users', authMiddleware, userRoutes)
 app.use('/api/customers', authMiddleware, customerRoutes)
-app.use('/api/customers-pg', authMiddleware, customerPgRoutes)
 app.use('/api/products', authMiddleware, productRoutes)
 app.use('/api/orders', authMiddleware, orderRoutes)
 app.use('/api/production', authMiddleware, productionRoutes)
@@ -127,11 +134,14 @@ app.use('*', (req, res) => {
 // Error handling middleware
 app.use(errorHandler)
 
-// Start server
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`🚀 Saft ERP API server running on port ${PORT}`)
-  console.log(`📊 Environment: ${process.env.NODE_ENV}`)
-  console.log(`🔗 Health check: http://localhost:${PORT}/health`)
-})
+// Start server only if not in Vercel environment
+if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+  app.listen(PORT, '0.0.0.0', () => {
+    console.log(`🚀 Saft ERP API server running on port ${PORT}`)
+    console.log(`📊 Environment: ${process.env.NODE_ENV}`)
+    console.log(`🔗 Health check: http://localhost:${PORT}/health`)
+  })
+}
 
+// Export for Vercel
 module.exports = app 
