@@ -1,5 +1,7 @@
-const DEFAULT_BACKEND_URL = 'https://safetex-1.onrender.com/api'
+// Backend API URL configuration
+export const DEFAULT_BACKEND_URL = 'https://safetex-1.onrender.com/api'
 
+// Function to get the API base URL based on environment and hostname
 export const getApiBaseUrl = () => {
   // Log environment and window location for debugging
   if (typeof window !== 'undefined') {
