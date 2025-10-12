@@ -1,8 +1,7 @@
 import { useEffect } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useDispatch, useSelector } from 'react-redux'
-import { onAuthStateChanged } from 'firebase/auth'
-import { auth } from './config/firebase'
+import { auth } from './config/supabase'
 import { setUser, setLoading } from './store/slices/authSlice'
 
 // Layouts
@@ -47,30 +46,35 @@ function App() {
   }
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (user) => {
-      if (user) {
+    // Check for stored token on app load
+    const checkAuthStatus = async () => {
+      const storedToken = localStorage.getItem('auth_token')
+      
+      if (storedToken) {
         try {
-          // Get user's ID token
-          const token = await user.getIdToken()
-          
           // Auto-detect API URL based on current hostname
           const getApiBaseUrl = () => {
             if (import.meta.env.VITE_API_URL) {
               return import.meta.env.VITE_API_URL
             }
             const hostname = window.location.hostname
-            const port = '5000'
+            
             if (hostname === 'localhost' || hostname === '127.0.0.1') {
-              return `http://localhost:${port}`
+              // Local development - use localhost backend
+              return 'http://localhost:5000'
+            } else if (hostname === 'safetexenterprises.vercel.app') {
+              // Production Vercel frontend - use Render backend
+              return 'https://safetex-1.onrender.com'
             } else {
-              return `http://${hostname}:${port}`
+              // Fallback for other domains
+              return 'https://safetex-1.onrender.com'
             }
           }
           
-          // Fetch user data from backend including role
+          // Verify token with backend
           const response = await fetch(`${getApiBaseUrl()}/api/users/me`, {
             headers: {
-              'Authorization': `Bearer ${token}`,
+              'Authorization': `Bearer ${storedToken}`,
               'Content-Type': 'application/json'
             }
           })
@@ -78,31 +82,28 @@ function App() {
           if (response.ok) {
             const userData = await response.json()
             dispatch(setUser({
-              uid: user.uid,
-              email: user.email,
-              displayName: user.displayName,
-              role: userData.data?.role || 'user', // Get role from database
+              uid: userData.data.id,
+              email: userData.data.email,
+              displayName: userData.data.display_name,
+              role: userData.data.role,
             }))
           } else {
-            // If user doesn't exist in database, don't authenticate them
-            console.log('User not found in database, redirecting to login...')
+            // Token is invalid, remove it
+            localStorage.removeItem('auth_token')
             dispatch(setUser(null))
-            // Sign out the user from Firebase if they don't exist in our database
-            await auth.signOut()
           }
         } catch (error) {
-          console.error('Error getting user data:', error)
-          // Don't authenticate on error, force login
+          console.error('Error verifying token:', error)
+          localStorage.removeItem('auth_token')
           dispatch(setUser(null))
-          await auth.signOut()
         }
       } else {
         dispatch(setUser(null))
       }
       dispatch(setLoading(false))
-    })
+    }
 
-    return () => unsubscribe()
+    checkAuthStatus()
   }, [dispatch])
 
   if (loading) {

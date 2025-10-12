@@ -1,5 +1,5 @@
 import axios from 'axios'
-import { auth } from '../config/firebase'
+import { auth } from '../config/supabase'
 
 // Auto-detect API URL based on current hostname
 const getApiBaseUrl = () => {
@@ -10,13 +10,16 @@ const getApiBaseUrl = () => {
   
   // Auto-detect based on current hostname
   const hostname = window.location.hostname
-  const port = '5000'
   
   if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    return `http://localhost:${port}`
+    // Local development - use localhost backend
+    return 'http://localhost:5000'
+  } else if (hostname === 'safetexenterprises.vercel.app') {
+    // Production Vercel frontend - use Render backend
+    return 'https://safetex-1.onrender.com'
   } else {
-    // For mobile/network access, use the same hostname with backend port
-    return `http://${hostname}:${port}`
+    // Fallback for other domains
+    return 'https://safetex-1.onrender.com'
   }
 }
 
@@ -32,14 +35,21 @@ const api = axios.create({
 // Request interceptor to add auth token
 api.interceptors.request.use(
   async (config) => {
-    const user = auth.currentUser
-    if (user) {
-      try {
-        const token = await user.getIdToken()
-        config.headers.Authorization = `Bearer ${token}`
-      } catch (error) {
-        console.error('Error getting auth token:', error)
+    try {
+      // Try to get token from localStorage first (for demo mode)
+      const storedToken = localStorage.getItem('auth_token')
+      if (storedToken) {
+        config.headers.Authorization = `Bearer ${storedToken}`
+        return config
       }
+      
+      // Fallback to Supabase auth
+      const token = await auth.getAccessToken()
+      if (token) {
+        config.headers.Authorization = `Bearer ${token}`
+      }
+    } catch (error) {
+      console.error('Error getting auth token:', error)
     }
     return config
   },

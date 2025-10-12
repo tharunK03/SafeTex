@@ -76,6 +76,7 @@ app.use(helmet())
 app.use(cors({
   origin: [
     process.env.CORS_ORIGIN || 'http://localhost:3000',
+    'https://safetexenterprises.vercel.app',
     'http://192.168.29.77:3000',
     'http://localhost:3000'
   ],
