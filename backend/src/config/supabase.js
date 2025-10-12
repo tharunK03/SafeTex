@@ -8,26 +8,54 @@ try {
 } catch (_) {}
 
 // Validate required environment variables
-const supabaseUrl = process.env.SUPABASE_URL
-const supabaseKey = process.env.SUPABASE_ANON_KEY
-const databaseUrl = process.env.DATABASE_URL
+const supabaseUrl = process.env.SUPABASE_URL?.trim()
+const supabaseKey = process.env.SUPABASE_ANON_KEY?.trim()
+const databaseUrl = process.env.DATABASE_URL?.trim()
 
 console.log('🔄 Checking Supabase configuration...')
 console.log('Environment:', process.env.NODE_ENV)
-console.log('Variables present:', {
-  SUPABASE_URL: !!supabaseUrl,
-  SUPABASE_KEY: !!supabaseKey,
-  DATABASE_URL: !!databaseUrl,
+
+// Validate URL format
+let isValidUrl = false
+try {
+  new URL(supabaseUrl)
+  isValidUrl = true
+} catch (e) {
+  console.error('❌ Invalid Supabase URL format')
+}
+
+// Validate API key format (should be a JWT-like string)
+const isValidKey = typeof supabaseKey === 'string' && 
+                  supabaseKey.split('.').length === 3 && 
+                  supabaseKey.length > 50
+
+console.log('Validation results:', {
+  SUPABASE_URL: {
+    present: !!supabaseUrl,
+    length: supabaseUrl?.length,
+    validFormat: isValidUrl,
+    value: supabaseUrl ? `${supabaseUrl.substring(0, 8)}...` : undefined
+  },
+  SUPABASE_KEY: {
+    present: !!supabaseKey,
+    length: supabaseKey?.length,
+    validFormat: isValidKey,
+    preview: supabaseKey ? `${supabaseKey.substring(0, 5)}...${supabaseKey.substring(supabaseKey.length - 5)}` : undefined
+  },
+  DATABASE_URL: {
+    present: !!databaseUrl,
+    length: databaseUrl?.length
+  }
 })
 
-if (!supabaseUrl || !supabaseKey || !databaseUrl) {
-  console.error('❌ Missing required environment variables:')
-  console.error('SUPABASE_URL:', supabaseUrl ? '✅' : '❌')
-  console.error('SUPABASE_ANON_KEY:', supabaseKey ? '✅' : '❌')
-  console.error('DATABASE_URL:', databaseUrl ? '✅' : '❌')
+if (!isValidUrl || !isValidKey || !databaseUrl) {
+  console.error('❌ Invalid configuration:')
+  if (!isValidUrl) console.error('- Supabase URL is not a valid URL')
+  if (!isValidKey) console.error('- Supabase key is not in correct format')
+  if (!databaseUrl) console.error('- Database URL is missing')
   
   if (process.env.NODE_ENV === 'production') {
-    console.error('Production environment detected. Will attempt to continue...')
+    console.error('⚠️ Production environment detected. Service may not work correctly!')
   } else {
     process.exit(1)
   }
@@ -35,11 +63,41 @@ if (!supabaseUrl || !supabaseKey || !databaseUrl) {
 
 // Supabase client for real-time features and auth
 console.log('🔄 Initializing Supabase client...')
-console.log('URL Length:', supabaseUrl?.length)
-console.log('Key Length:', supabaseKey?.length)
 
-const supabase = createClient(supabaseUrl, supabaseKey)
-console.log('✅ Supabase client initialized')
+// Create Supabase client with error handling
+let supabase
+try {
+  supabase = createClient(supabaseUrl, supabaseKey, {
+    auth: {
+      autoRefreshToken: true,
+      persistSession: true
+    }
+  })
+  
+  // Test the connection
+  ;(async () => {
+    try {
+      const { data, error } = await supabase.from('products').select('id').limit(1)
+      if (error) throw error
+      console.log('✅ Supabase connection test successful')
+    } catch (error) {
+      console.error('❌ Supabase connection test failed:', {
+        message: error.message,
+        hint: error.hint,
+        details: error.details
+      })
+    }
+  })()
+  
+  console.log('✅ Supabase client initialized')
+} catch (error) {
+  console.error('❌ Failed to initialize Supabase client:', {
+    message: error.message,
+    name: error.name,
+    stack: error.stack
+  })
+  throw error
+}
 
 // Platform-specific connection pool configuration
 const getPoolConfig = () => {
@@ -83,6 +141,9 @@ const getPoolConfig = () => {
 
 // Initialize the connection pool
 const pool = new Pool(getPoolConfig())
+
+// Export supabase client for use in other files
+module.exports = { supabase, pool }
 
 // Test database connection
 const testConnection = async () => {
