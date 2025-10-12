@@ -31,7 +31,8 @@ export const getApiBaseUrl = () => {
 
     if (hostname === 'safetexenterprises.vercel.app' || 
         hostname === 'safe-tex-tharuns-projects-7933d4cd.vercel.app' ||
-        hostname === 'safe-tex-git-main-tharuns-projects-7933d4cd.vercel.app') {
+        hostname === 'safe-tex-git-main-tharuns-projects-7933d4cd.vercel.app' ||
+        hostname === 'safe-tex.vercel.app') {
       return DEFAULT_BACKEND_URL
     }
   }
