@@ -34,6 +34,8 @@ const PORT = process.env.PORT || 5000
 // Initialize Supabase Database
 const initializeApp = async () => {
   try {
+    console.log('🔄 Starting database initialization...')
+    
     // Test database connection
     const connected = await testConnection()
     if (!connected) {
@@ -108,7 +110,9 @@ app.get('/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     message: 'Saft ERP API is running',
-    timestamp: new Date().toISOString()
+    timestamp: new Date().toISOString(),
+    environment: process.env.NODE_ENV || 'development',
+    render: process.env.RENDER ? 'true' : 'false'
   })
 })
 
