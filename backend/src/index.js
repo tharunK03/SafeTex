@@ -181,6 +181,13 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
     console.log(`🚀 Saft ERP API server running on port ${PORT}`)
     console.log(`📊 Environment: ${process.env.NODE_ENV}`)
     console.log(`🔗 Health check: http://localhost:${PORT}/health`)
+    console.log('📝 Registered routes:')
+    console.log('  - POST /api/auth/login')
+    app._router.stack.forEach((r) => {
+      if (r.route && r.route.path) {
+        console.log(`  - ${Object.keys(r.route.methods).join(',')} ${r.route.path}`)
+      }
+    })
   })
 }
 

@@ -32,6 +32,7 @@ const Login = () => {
 
     try {
       // Login via backend API using axios instance
+      console.log('Attempting login with API URL:', api.defaults.baseURL);
       const response = await api.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
