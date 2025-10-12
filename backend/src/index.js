@@ -70,23 +70,15 @@ const initializeApp = async () => {
     // Security middleware
     app.use(helmet())
 
-    // CORS configuration
-    app.use(cors({
-      origin: [
-        process.env.CORS_ORIGIN || 'http://localhost:3000',
-        'https://safe-tex.vercel.app',
-        'https://safetexenterprises.vercel.app',
-        'https://safe-tex-tharuns-projects-7933d4cd.vercel.app',
-        'https://safe-tex-git-main-tharuns-projects-7933d4cd.vercel.app',
-        'http://192.168.29.77:3000',
-        'http://localhost:3000'
-      ],
-      credentials: true,
-      methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-      allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
-    }))
-
-    // Rate limiting
+// CORS configuration
+app.use(cors({
+  origin: true, // Allow all origins in development
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  maxAge: 600 // Increase preflight cache to 10 minutes
+}))    // Rate limiting
     const limiter = rateLimit({
       windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
       max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100, // limit each IP to 100 requests per windowMs

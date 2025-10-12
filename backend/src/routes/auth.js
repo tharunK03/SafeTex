@@ -6,6 +6,15 @@ const { createDemoToken, DEMO_USERS } = require('../../demo-auth-bypass')
 
 const router = express.Router()
 
+// Handle OPTIONS requests for CORS pre-flight
+router.options('/login', (req, res) => {
+  res.header('Access-Control-Allow-Origin', req.headers.origin || '*')
+  res.header('Access-Control-Allow-Methods', 'POST, OPTIONS')
+  res.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+  res.header('Access-Control-Allow-Credentials', 'true')
+  res.status(200).end()
+})
+
 // @route   POST /api/auth/login
 // @desc    Login with email and password
 // @access  Public
