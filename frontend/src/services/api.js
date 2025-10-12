@@ -4,9 +4,10 @@ import { getApiBaseUrl } from '../utils/apiBaseUrl'
 
 const api = axios.create({
   baseURL: getApiBaseUrl(),
-  withCredentials: true,
+  withCredentials: false, // Changed to false since we're not using session cookies
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
 })
 

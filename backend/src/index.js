@@ -81,10 +81,13 @@ app.use(cors({
     'https://safetexenterprises.vercel.app',
     'https://safe-tex-tharuns-projects-7933d4cd.vercel.app',
     'https://safe-tex-git-main-tharuns-projects-7933d4cd.vercel.app',
+    'https://safe-tex.vercel.app',
     'http://192.168.29.77:3000',
     'http://localhost:3000'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
 }))
 
 // Rate limiting

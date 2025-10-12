@@ -3,6 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useDispatch } from 'react-redux'
 import { auth } from '../../config/supabase'
 import { setUser, setLoading, setError } from '../../store/slices/authSlice'
+import api from '../../services/api'
 import { Mail, Lock, Eye, EyeOff } from 'lucide-react'
 import toast from 'react-hot-toast'
 
@@ -30,35 +31,10 @@ const Login = () => {
     dispatch(setLoading(true))
 
     try {
-      // Auto-detect API URL based on current hostname
-      const getApiBaseUrl = () => {
-        if (import.meta.env.VITE_API_URL) {
-          return import.meta.env.VITE_API_URL
-        }
-        const hostname = window.location.hostname
-        
-        if (hostname === 'localhost' || hostname === '127.0.0.1') {
-          // Local development - use localhost backend
-          return 'http://localhost:5000'
-        } else if (hostname === 'safetexenterprises.vercel.app') {
-          // Production Vercel frontend - use Render backend
-          return 'https://safetex-1.onrender.com'
-        } else {
-          // Fallback for other domains
-          return 'https://safetex-1.onrender.com'
-        }
-      }
-      
-      // Login via backend API
-      const response = await fetch(`${getApiBaseUrl()}/api/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          email: formData.email,
-          password: formData.password
-        })
+      // Login via backend API using axios instance
+      const response = await api.post('/auth/login', {
+        email: formData.email,
+        password: formData.password
       })
 
       const result = await response.json()
