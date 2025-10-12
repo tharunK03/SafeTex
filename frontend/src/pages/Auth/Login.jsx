@@ -32,14 +32,14 @@ const Login = () => {
 
     try {
       // Login via backend API using axios instance
-      const response = await api.post('/auth/login', {
+      const response = await api.post('/api/auth/login', {
         email: formData.email,
         password: formData.password
       })
 
-      const result = await response.json()
-
-      if (response.ok && result.success) {
+      console.log('Login response:', response.data); // Debug log
+      if (response.data && response.data.success) {
+        const result = response.data
         const { token, user } = result.data
         
         // Store the token for future API calls
