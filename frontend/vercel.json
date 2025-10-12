@@ -8,6 +8,9 @@
       "destination": "https://safetex-1.onrender.com/api/:path*"
     }
   ],
+  "env": {
+    "VITE_API_URL": "https://safetex-1.onrender.com/api"
+  },
   "headers": [
     {
       "source": "/api/(.*)",

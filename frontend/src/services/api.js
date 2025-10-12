@@ -1,31 +1,10 @@
 import axios from 'axios'
 import { auth } from '../config/supabase'
-
-// Auto-detect API URL based on current hostname
-const getApiBaseUrl = () => {
-  // If VITE_API_URL is set, use it
-  if (import.meta.env.VITE_API_URL) {
-    return import.meta.env.VITE_API_URL
-  }
-  
-  // Auto-detect based on current hostname
-  const hostname = window.location.hostname
-  
-  if (hostname === 'localhost' || hostname === '127.0.0.1') {
-    // Local development - use localhost backend
-    return 'http://localhost:5000'
-  } else if (hostname === 'safetexenterprises.vercel.app') {
-    // Production Vercel frontend - use Render backend
-    return 'https://safetex-1.onrender.com'
-  } else {
-    // Fallback for other domains
-    return 'https://safetex-1.onrender.com'
-  }
-}
-
-const API_BASE_URL = getApiBaseUrl()
+import { getApiBaseUrl } from '../utils/apiBaseUrl'
 
 const api = axios.create({
+  baseURL: getApiBaseUrl(),
+  withCredentials: true,
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',

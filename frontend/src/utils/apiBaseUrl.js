@@ -1,6 +1,11 @@
-const DEFAULT_BACKEND_URL = 'https://safetex-1.onrender.com'
+const DEFAULT_BACKEND_URL = 'https://safetex-1.onrender.com/api'
 
 export const getApiBaseUrl = () => {
+  // Log environment and window location for debugging
+  if (typeof window !== 'undefined') {
+    console.log('Window location:', window.location.toString())
+    console.log('Environment API URL:', import.meta.env.VITE_API_URL)
+  }
   const envUrl = import.meta.env.VITE_API_URL?.trim()
 
   if (envUrl) {
