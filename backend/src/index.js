@@ -79,6 +79,8 @@ app.use(cors({
   origin: [
     process.env.CORS_ORIGIN || 'http://localhost:3000',
     'https://safetexenterprises.vercel.app',
+    'https://safe-tex-tharuns-projects-7933d4cd.vercel.app',
+    'https://safe-tex-git-main-tharuns-projects-7933d4cd.vercel.app',
     'http://192.168.29.77:3000',
     'http://localhost:3000'
   ],
