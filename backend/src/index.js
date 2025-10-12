@@ -38,6 +38,15 @@ console.log('Environment vars:', {
 // Initialize Supabase
 const { testConnection } = require('./config/supabase')
 
+// Debug environment variables
+console.log('Environment check:', {
+  NODE_ENV: process.env.NODE_ENV,
+  SUPABASE_URL_SET: !!process.env.SUPABASE_URL,
+  SUPABASE_KEY_SET: !!process.env.SUPABASE_ANON_KEY,
+  SUPABASE_URL_LENGTH: process.env.SUPABASE_URL?.length,
+  SUPABASE_KEY_LENGTH: process.env.SUPABASE_ANON_KEY?.length,
+})
+
 // Import routes
 const authRoutes = require('./routes/auth')
 const customerRoutes = require('./routes/customers-pg')

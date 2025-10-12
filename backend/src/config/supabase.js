@@ -12,16 +12,34 @@ const supabaseUrl = process.env.SUPABASE_URL
 const supabaseKey = process.env.SUPABASE_ANON_KEY
 const databaseUrl = process.env.DATABASE_URL
 
+console.log('🔄 Checking Supabase configuration...')
+console.log('Environment:', process.env.NODE_ENV)
+console.log('Variables present:', {
+  SUPABASE_URL: !!supabaseUrl,
+  SUPABASE_KEY: !!supabaseKey,
+  DATABASE_URL: !!databaseUrl,
+})
+
 if (!supabaseUrl || !supabaseKey || !databaseUrl) {
   console.error('❌ Missing required environment variables:')
   console.error('SUPABASE_URL:', supabaseUrl ? '✅' : '❌')
   console.error('SUPABASE_ANON_KEY:', supabaseKey ? '✅' : '❌')
   console.error('DATABASE_URL:', databaseUrl ? '✅' : '❌')
-  process.exit(1)
+  
+  if (process.env.NODE_ENV === 'production') {
+    console.error('Production environment detected. Will attempt to continue...')
+  } else {
+    process.exit(1)
+  }
 }
 
 // Supabase client for real-time features and auth
+console.log('🔄 Initializing Supabase client...')
+console.log('URL Length:', supabaseUrl?.length)
+console.log('Key Length:', supabaseKey?.length)
+
 const supabase = createClient(supabaseUrl, supabaseKey)
+console.log('✅ Supabase client initialized')
 
 // Platform-specific connection pool configuration
 const getPoolConfig = () => {
