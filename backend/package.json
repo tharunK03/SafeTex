@@ -4,13 +4,12 @@
   "description": "Backend API for Saft ERP System",
   "main": "src/index.js",
   "scripts": {
-    "start": "node src/index.js",
+    "start": "node --max-old-space-size=512 src/index.js",
     "dev": "nodemon src/index.js",
-    "build": "npm ci --production",
+    "build": "npm ci --omit=dev --no-audit",
     "test": "jest",
     "vercel-build": "echo 'Build completed'",
-    "vercel-dev": "node src/index.js",
-    "postinstall": "npm run build"
+    "vercel-dev": "node src/index.js"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.38.4",
