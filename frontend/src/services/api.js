@@ -5,7 +5,6 @@ import { getApiBaseUrl } from '../utils/apiBaseUrl'
 const api = axios.create({
   baseURL: getApiBaseUrl(),
   withCredentials: true,
-  baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
