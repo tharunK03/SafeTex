@@ -1,47 +1,79 @@
 const express = require('express')
 const { body, validationResult } = require('express-validator')
-const { getAuth } = require('../config/firebase')
+const { supabase } = require('../config/supabase')
 const { requireAdmin } = require('../middlewares/auth')
+const { createDemoToken, DEMO_USERS } = require('../../demo-auth-bypass')
 
 const router = express.Router()
 
 // @route   POST /api/auth/login
-// @desc    Verify Firebase token and return user info
+// @desc    Login with email and password
 // @access  Public
 router.post('/login', async (req, res) => {
   try {
-    const { idToken } = req.body
+    const { email, password } = req.body
 
-    if (!idToken) {
+    console.log('🔐 Login attempt:', { email, hasPassword: !!password })
+    console.log('🔍 DEMO_USERS available:', Object.keys(DEMO_USERS || {}))
+
+    if (!email || !password) {
       return res.status(400).json({
         success: false,
-        error: 'ID token is required'
+        error: 'Email and password are required'
       })
     }
 
-    // Verify the Firebase ID token
-    const auth = getAuth()
-    const decodedToken = await auth.verifyIdToken(idToken)
+    // Check if it's a demo user
+    if (DEMO_USERS && DEMO_USERS[email] && DEMO_USERS[email].password === password) {
+      console.log('✅ Demo user login detected:', email)
+      const demoToken = await createDemoToken(email)
+      return res.json({
+        success: true,
+        data: {
+          token: demoToken,
+          user: {
+            id: `demo-${email}`,
+            email: email,
+            name: DEMO_USERS[email].name,
+            role: DEMO_USERS[email].role,
+            emailVerified: true
+          }
+        }
+      })
+    }
 
-    // Get user data from Firestore (you can add additional user data here)
-    const userData = {
-      uid: decodedToken.uid,
-      email: decodedToken.email,
-      emailVerified: decodedToken.email_verified,
-      name: decodedToken.name || decodedToken.email,
-      picture: decodedToken.picture,
-      role: decodedToken.role || 'user'
+    // Try Supabase authentication
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password
+    })
+
+    if (error) {
+      return res.status(401).json({
+        success: false,
+        error: error.message
+      })
     }
 
     res.json({
       success: true,
-      data: userData
+      data: {
+        token: data.session.access_token,
+        user: {
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.user_metadata?.full_name || data.user.email,
+          role: data.user.user_metadata?.role || 'user',
+          emailVerified: data.user.email_confirmed_at ? true : false
+        }
+      }
     })
   } catch (error) {
     console.error('Login error:', error)
-    res.status(401).json({
+    res.status(500).json({
       success: false,
-      error: 'Invalid token'
+      error: 'Login failed',
+      details: error.message
     })
   }
 })
