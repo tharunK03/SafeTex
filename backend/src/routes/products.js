@@ -9,18 +9,27 @@ const router = express.Router()
 // @access  Private
 router.get('/', async (req, res) => {
   try {
+    console.log('🔍 Fetching products...')
     const { data: products, error } = await supabase
       .from('products')
       .select('*')
       .order('created_at', { ascending: false })
     
     if (error) {
-      console.error('Error fetching products:', error)
+      console.error('❌ Error fetching products:', {
+        message: error.message,
+        code: error.code,
+        details: error.details,
+        hint: error.hint
+      })
       return res.status(500).json({
         success: false,
-        error: 'Failed to fetch products'
+        error: 'Failed to fetch products',
+        details: process.env.NODE_ENV === 'development' ? error.message : undefined
       })
     }
+    
+    console.log(`✅ Successfully fetched ${products?.length || 0} products`)
 
     // Transform snake_case to camelCase for frontend compatibility
     const transformedProducts = (products || []).map(product => ({
