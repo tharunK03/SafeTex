@@ -105,6 +105,29 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 // Static file serving for PDFs
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
 
+// Root route handler
+app.get('/', (req, res) => {
+  res.status(200).json({
+    name: 'Saft ERP API',
+    version: '1.0.0',
+    description: 'Backend API for Saft ERP System',
+    docs: '/api-docs',
+    health: '/health',
+    endpoints: {
+      auth: '/api/auth',
+      users: '/api/users',
+      customers: '/api/customers',
+      products: '/api/products',
+      orders: '/api/orders',
+      production: '/api/production',
+      rawMaterials: '/api/raw-materials',
+      invoices: '/api/invoices',
+      reports: '/api/reports',
+      stats: '/api/stats'
+    }
+  })
+})
+
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).json({ 
