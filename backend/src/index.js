@@ -16,6 +16,16 @@ if (dotenvResult.error) {
   process.exit(1)
 }
 
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DATABASE_URL']
+const missingEnv = requiredEnv.filter((key) => !process.env[key])
+if (missingEnv.length > 0) {
+  console.error('❌ Missing required environment variables:', missingEnv.join(', '))
+  requiredEnv.forEach((key) => {
+    console.error(`${key}:`, process.env[key] ? '✅' : '❌')
+  })
+  process.exit(1)
+}
+
 console.log('✅ Environment variables loaded from:', path.resolve(process.cwd(), '.env'))
 console.log('Environment vars:', {
   SUPABASE_URL: process.env.SUPABASE_URL ? '✅' : '❌',
