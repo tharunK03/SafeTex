@@ -123,7 +123,8 @@ router.post('/register',
       await auth.setCustomUserClaims(userRecord.uid, { role })
 
       // Create user document in Firestore
-      const db = require('../config/firebase').getFirestore()
+      const { getFirestore } = await import('../config/firebase.js')
+      const db = getFirestore()
       await db.collection('users').doc(userRecord.uid).set({
         email,
         name: name || email,

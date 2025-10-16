@@ -1,6 +1,6 @@
-const express = require('express')
-const { body, validationResult } = require('express-validator')
-const db = require('../services/memory-db')
+import express from 'express'
+import { body, validationResult } from 'express-validator'
+import db from '../services/memory-db.js'
 
 const router = express.Router()
 
@@ -157,5 +157,5 @@ router.get('/:id', async (req, res) => {
   }
 })
 
-module.exports = router
+export default router
 

@@ -342,7 +342,7 @@ class MemoryDatabase {
   }
 }
 
-module.exports = new MemoryDatabase()
+export default new MemoryDatabase()
 
 
 
