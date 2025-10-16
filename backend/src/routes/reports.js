@@ -1,7 +1,7 @@
-const express = require('express')
-const { getFirestore } = require('../config/firebase')
+import express from 'express';
+import { getFirestore } from '../config/firebase.js';
 
-const router = express.Router()
+const router = express.Router();
 
 // @route   GET /api/reports
 // @desc    Get available reports
@@ -150,4 +150,4 @@ router.post('/generate', async (req, res) => {
   }
 })
 
-module.exports = router 
+export default router;

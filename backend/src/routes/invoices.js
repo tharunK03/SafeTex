@@ -1,12 +1,25 @@
-const express = require('express')
-const { body, validationResult } = require('express-validator')
-const { supabase } = require('../config/supabase')
-const InvoiceGenerator = require('../services/invoiceGenerator')
-const path = require('path')
-const fs = require('fs')
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import { supabase } from '../config/supabase.js';
+import InvoiceGenerator from '../services/invoiceGenerator.js';
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 
 const router = express.Router()
 const invoiceGenerator = new InvoiceGenerator()
+
+// Ensure uploads directory exists (configurable)
+const uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '../../uploads')
+if (!fs.existsSync(uploadsDir)){
+  fs.mkdirSync(uploadsDir, { recursive: true })
+}
 
 // @route   GET /api/invoices
 // @desc    Get all invoices
@@ -356,9 +369,10 @@ router.get('/:id/generate-pdf', async (req, res) => {
 
   } catch (error) {
     console.error('Error generating PDF:', error)
-    res.status(500).json({
+    const status = error.message?.startsWith('PDF_GENERATION_FAILED') ? 502 : 500
+    res.status(status).json({
       success: false,
-      error: 'Failed to generate PDF'
+      error: error.message || 'Failed to generate PDF'
     })
   }
 })
@@ -371,7 +385,7 @@ router.get('/:id/download', async (req, res) => {
     const { id } = req.params
 
     // Check if PDF already exists
-    const pdfPath = path.join(__dirname, '../../uploads', `invoice-${id}.pdf`)
+    const pdfPath = path.join(uploadsDir, `invoice-${id}.pdf`)
     
     if (fs.existsSync(pdfPath)) {
       // Check if file has content
@@ -493,11 +507,12 @@ async function generateAndSendPDF(invoiceId, res) {
 
   } catch (error) {
     console.error('Error generating PDF:', error)
-    res.status(500).json({
+    const status = error.message?.startsWith('PDF_GENERATION_FAILED') ? 502 : 500
+    res.status(status).json({
       success: false,
-      error: 'Failed to generate PDF'
+      error: error.message || 'Failed to generate PDF'
     })
   }
 }
 
-module.exports = router 
+export default router;

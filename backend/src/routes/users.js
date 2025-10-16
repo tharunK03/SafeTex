@@ -1,7 +1,7 @@
-const express = require('express')
-const { body, validationResult } = require('express-validator')
-const { supabase } = require('../config/supabase')
-const { requirePermission, requireRole, ROLES, getAllRoles } = require('../config/roles')
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import { supabase } from '../config/supabase.js';
+import { requirePermission, requireRole, ROLES, getAllRoles } from '../config/roles.js';
 
 const router = express.Router()
 
@@ -362,4 +362,4 @@ router.get('/roles', async (req, res) => {
   }
 })
 
-module.exports = router
+export default router;

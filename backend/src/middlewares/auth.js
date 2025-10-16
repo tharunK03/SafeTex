@@ -1,5 +1,5 @@
-const { supabase } = require('../config/supabase')
-const { verifyDemoToken, DEMO_USERS } = require('../../demo-auth-bypass')
+import { supabase } from '../config/supabase.js';
+import { verifyDemoToken, DEMO_USERS } from '../../demo-auth-bypass.js';
 
 const authMiddleware = async (req, res, next) => {
   try {
@@ -22,11 +22,14 @@ const authMiddleware = async (req, res, next) => {
     }
 
     // Check if it's a demo token first
+    console.log('Token in auth middleware:', token)
     const demoUser = verifyDemoToken(token)
+    console.log('Demo user:', demoUser)
     if (demoUser) {
+      const demoUserId = `demo-${demoUser.email}`
       req.user = {
-        id: demoUser.id,
-        uid: demoUser.id, // For compatibility
+        id: demoUserId,
+        uid: demoUserId, // For compatibility
         email: demoUser.email,
         emailVerified: true,
         name: demoUser.user_metadata?.full_name || demoUser.email,
@@ -107,10 +110,10 @@ const requireSales = requireRole(['admin', 'sales'])
 // Production and admin middleware
 const requireProduction = requireRole(['admin', 'production'])
 
-module.exports = {
+export {
   authMiddleware,
   requireRole,
   requireAdmin,
   requireSales,
   requireProduction
-} 
+};

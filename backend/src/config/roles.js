@@ -223,7 +223,7 @@ const requireRole = (allowedRoles) => {
   }
 }
 
-module.exports = {
+export {
   ROLES,
   ROLE_PERMISSIONS,
   RLS_POLICIES,
@@ -232,4 +232,4 @@ module.exports = {
   getAllRoles,
   requirePermission,
   requireRole
-}
+};

@@ -1,4 +1,4 @@
-const { pool } = require('../config/supabase')
+import { pool } from '../config/supabase.js';
 
 class DatabaseService {
   // Generic query method
@@ -47,6 +47,7 @@ class DatabaseService {
     const client = await pool.connect()
     try {
       await client.query('BEGIN')
+
       const result = await callback(client)
       await client.query('COMMIT')
       return result
@@ -59,7 +60,8 @@ class DatabaseService {
   }
 }
 
-module.exports = new DatabaseService()
+const db = new DatabaseService();
+export default db;
 
 
 

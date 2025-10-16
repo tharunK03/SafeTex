@@ -1,8 +1,8 @@
-const express = require('express')
-const { body, validationResult } = require('express-validator')
-const { supabase } = require('../config/supabase')
-const { requireAdmin } = require('../middlewares/auth')
-const { createDemoToken, DEMO_USERS } = require('../../demo-auth-bypass')
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import { supabase } from '../config/supabase.js';
+import { requireAdmin } from '../middlewares/auth.js';
+import { createDemoToken, DEMO_USERS } from '../../demo-auth-bypass.js';
 
 const router = express.Router()
 
@@ -186,4 +186,4 @@ router.get('/me', async (req, res) => {
   }
 })
 
-module.exports = router 
+export default router;

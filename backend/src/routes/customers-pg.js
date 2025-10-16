@@ -1,7 +1,7 @@
-const express = require('express')
-const { body, validationResult } = require('express-validator')
-const db = require('../services/database')
-const { requirePermission, requireRole, ROLES } = require('../config/roles')
+import express from 'express';
+import { body, validationResult } from 'express-validator';
+import db from '../services/database.js';
+import { requirePermission, requireRole, ROLES } from '../config/roles.js';
 
 const router = express.Router()
 
@@ -60,19 +60,25 @@ router.post('/', requirePermission('customers', 'create'), [
     }
 
     const { name, contact_person, email, phone, address, gst_no } = req.body
+    console.log('User from middleware:', req.user)
     const created_by = req.user.uid // From auth middleware
 
-    // Get user ID from Firebase UID
-    const user = await db.getOne(
-      'SELECT id FROM users WHERE firebase_uid = $1',
-      [created_by]
-    )
+    // For demo users, use their ID directly
+    let userId = created_by
+    if (!created_by.startsWith('demo-')) {
+      // Get user ID from Firebase UID for non-demo users
+      const user = await db.getOne(
+        'SELECT id FROM users WHERE firebase_uid = $1',
+        [created_by]
+      )
 
-    if (!user) {
-      return res.status(400).json({
-        success: false,
-        error: 'User not found'
-      })
+      if (!user) {
+        return res.status(400).json({
+          success: false,
+          error: 'User not found'
+        })
+      }
+      userId = user.id
     }
 
     // Insert new customer
@@ -81,7 +87,7 @@ router.post('/', requirePermission('customers', 'create'), [
         name, contact_person, email, phone, address, gst_no, created_by
       ) VALUES ($1, $2, $3, $4, $5, $6, $7)
       RETURNING *
-    `, [name, contact_person, email, phone, address, gst_no, user.id])
+    `, [name, contact_person, email, phone, address, gst_no, userId])
 
     res.status(201).json({
       success: true,
@@ -255,4 +261,4 @@ router.delete('/:id', requirePermission('customers', 'delete'), async (req, res)
   }
 })
 
-module.exports = router
+export default router;

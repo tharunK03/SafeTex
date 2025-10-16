@@ -1,8 +1,7 @@
-const { createClient } = require('@supabase/supabase-js')
-const { Pool } = require('pg')
 
-// Force IPv4 for better connectivity on some platforms
-const dns = require('dns')
+import { createClient } from '@supabase/supabase-js';
+import { Pool } from 'pg';
+import dns from 'dns';
 try { 
   dns.setDefaultResultOrder('ipv4first') 
 } catch (_) {}
@@ -168,9 +167,6 @@ const getPoolConfig = () => {
 // Initialize the connection pool
 const pool = new Pool(getPoolConfig())
 
-// Export supabase client for use in other files
-module.exports = { supabase, pool }
-
 // Test database connection
 const testConnection = async () => {
   try {
@@ -196,8 +192,4 @@ const testConnection = async () => {
   }
 }
 
-module.exports = {
-  supabase,
-  pool,
-  testConnection
-}
+export { supabase, pool, testConnection }

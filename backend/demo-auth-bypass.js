@@ -1,5 +1,5 @@
-require('dotenv').config();
-const { supabase } = require('./src/config/supabase');
+import 'dotenv/config';
+import { supabase } from './src/config/supabase.js';
 
 // Demo users that can bypass email confirmation
 const DEMO_USERS = {
@@ -33,7 +33,9 @@ async function createDemoToken(email) {
 
 function verifyDemoToken(token) {
   try {
+    console.log('Token to decode:', token);
     const decoded = JSON.parse(Buffer.from(token, 'base64').toString());
+    console.log('Decoded token:', decoded);
     
     if (decoded.demo && DEMO_USERS[decoded.email]) {
       return {
@@ -51,8 +53,4 @@ function verifyDemoToken(token) {
   }
 }
 
-module.exports = {
-  createDemoToken,
-  verifyDemoToken,
-  DEMO_USERS
-};
+export { createDemoToken, verifyDemoToken, DEMO_USERS };

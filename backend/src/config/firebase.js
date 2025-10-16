@@ -1,4 +1,4 @@
-const admin = require('firebase-admin')
+import admin from 'firebase-admin';
 
 // Initialize Firebase Admin SDK
 const initializeFirebase = () => {
@@ -53,9 +53,9 @@ const getAuth = () => {
   return admin.auth()
 }
 
-module.exports = {
+export {
   initializeFirebase,
   getFirestore,
   getAuth,
   admin
-} 
+};

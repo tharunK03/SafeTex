@@ -1,32 +1,45 @@
-const express = require('express')
-const dns = require('dns')
-// Prefer IPv4 to avoid ENETUNREACH on hosts without IPv6 (e.g., some PaaS egress)
-try { dns.setDefaultResultOrder('ipv4first') } catch (_) {}
-const cors = require('cors')
-const helmet = require('helmet')
-const morgan = require('morgan')
-const rateLimit = require('express-rate-limit')
-const path = require('path')
-const dotenv = require('dotenv')
-const { supabase } = require('./config/supabase')
+import 'dotenv/config';
 
-// Configure dotenv (only in development)
-if (process.env.NODE_ENV !== 'production') {
-  const dotenvResult = dotenv.config()
-  if (dotenvResult.error) {
-    console.warn('⚠️ No .env file found. Using environment variables.')
-  }
-}
+// Log environment variable loading
+console.log('📝 Loading environment variables from .env file...')
+console.log('✅ Environment variables loaded successfully')
+console.log('ENV variables:', {
+  SUPABASE_URL: process.env.SUPABASE_URL,
+  NODE_ENV: process.env.NODE_ENV,
+  DATABASE_URL: process.env.DATABASE_URL?.substring(0, 20) + '...'
+})
+
+import express from 'express';
+import dns from 'dns';
+import fs from 'fs';
+import cors from 'cors';
+import helmet from 'helmet';
+import morgan from 'morgan';
+import os from 'os';
+import rateLimit from 'express-rate-limit';
+import path from 'path';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+import { supabase } from './config/supabase.js';
+
+// Get __dirname equivalent in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+// Prefer IPv4 to avoid ENETUNREACH on hosts without IPv6
+try { dns.setDefaultResultOrder('ipv4first') } catch (_) {}
+
+// Remove redundant dotenv configuration since we already loaded it
 
 // Validate required environment variables
-const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY', 'DATABASE_URL']
+const requiredEnv = ['SUPABASE_URL', 'SUPABASE_ANON_KEY']
 const missingEnv = requiredEnv.filter((key) => !process.env[key])
 if (missingEnv.length > 0) {
   console.error('❌ Missing required environment variables:', missingEnv.join(', '))
   requiredEnv.forEach((key) => {
     console.error(`${key}:`, process.env[key] ? '✅' : '❌')
   })
-  process.exit(1)
+  // Do not exit in production on partial config; rely on healthcheck to surface issues
 }
 
 // Initialize express app
@@ -37,17 +50,44 @@ const PORT = process.env.PORT || 5000
 app.set('trust proxy', 1)
 
 // Security middleware
-app.use(helmet())
+app.use(helmet({
+  crossOriginResourcePolicy: false, // Allow PDF downloads
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "blob:"],
+      connectSrc: ["'self'", process.env.SUPABASE_URL],
+      frameSrc: ["'self'"],
+      fontSrc: ["'self'", "data:"],
+      mediaSrc: ["'self'"],
+      objectSrc: ["'none'"],
+      manifestSrc: ["'self'"]
+    }
+  }
+}))
 
-// CORS configuration
+// CORS configuration (explicit headers for proxies)
+const corsOrigin = process.env.CORS_ORIGIN ? process.env.CORS_ORIGIN.split(',') : true
 app.use(cors({
-  origin: process.env.CORS_ORIGIN || true,
+  origin: corsOrigin,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
-  exposedHeaders: ['Content-Range', 'X-Content-Range'],
+  exposedHeaders: ['Content-Range', 'X-Content-Range', 'Content-Disposition'],
   credentials: true,
-  maxAge: 600 // 10 minutes
+  maxAge: 600
 }))
+app.use((req, res, next) => {
+  if (corsOrigin === true) {
+    res.setHeader('Access-Control-Allow-Origin', '*')
+  }
+  res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,DELETE,OPTIONS')
+  res.setHeader('Access-Control-Allow-Headers', 'Content-Type, Authorization, X-Requested-With')
+  res.setHeader('Access-Control-Expose-Headers', 'Content-Range, X-Content-Range, Content-Disposition')
+  if (req.method === 'OPTIONS') return res.sendStatus(204)
+  next()
+})
 
 // Rate limiting
 const limiter = rateLimit({
@@ -60,14 +100,50 @@ app.use('/api/', limiter)
 app.use(express.json({ limit: '10mb' }))
 app.use(express.urlencoded({ extended: true, limit: '10mb' }))
 
-// Logging middleware
-if (process.env.NODE_ENV === 'development') {
-  app.use(morgan('dev'))
+// Structured logging
+const requestLogger = morgan(':method :url :status :res[content-length] - :response-time ms', {
+  skip: () => process.env.NODE_ENV === 'test'
+})
+app.use(requestLogger)
+app.use((req, res, next) => {
+  res.on('finish', () => {
+    const log = {
+      level: 'info',
+      timestamp: new Date().toISOString(),
+      method: req.method,
+      url: req.originalUrl,
+      status: res.statusCode,
+      ip: req.ip,
+      userAgent: req.get('user-agent'),
+      host: os.hostname()
+    }
+    if (res.statusCode >= 500) {
+      console.error(JSON.stringify(log))
+    } else if (res.statusCode >= 400) {
+      console.warn(JSON.stringify(log))
+    } else {
+      console.log(JSON.stringify(log))
+    }
+  })
+  next()
+})
+
+// Ensure uploads directory exists (configurable)
+const uploadsDir = process.env.UPLOADS_DIR
+  ? path.resolve(process.env.UPLOADS_DIR)
+  : path.join(__dirname, '../uploads')
+if (!fs.existsSync(uploadsDir)){
+  fs.mkdirSync(uploadsDir, { recursive: true })
 }
 
 // Static file serving
-app.use('/uploads', express.static(path.join(__dirname, '../uploads')))
+app.use('/uploads', express.static(uploadsDir))
 app.use(express.static(path.join(__dirname, '../../frontend/dist')))
+
+// Ensure runtime permissions for tmp directories (Render/containers)
+try {
+  fs.mkdirSync('/tmp/puppeteer_user_data', { recursive: true, mode: 0o755 })
+} catch {}
 
 // Health check endpoint with detailed diagnostics
 app.get('/health', async (req, res) => {
@@ -128,20 +204,21 @@ app.get('/health', async (req, res) => {
 })
 
 // Import routes
-const authRoutes = require('./routes/auth')
-const customerRoutes = require('./routes/customers-pg')
-const userRoutes = require('./routes/users')
-const productRoutes = require('./routes/products')
-const orderRoutes = require('./routes/orders')
-const productionRoutes = require('./routes/production')
-const rawMaterialRoutes = require('./routes/raw-materials')
-const invoiceRoutes = require('./routes/invoices')
-const reportRoutes = require('./routes/reports')
-const statsRoutes = require('./routes/stats')
+// Import routes
+import authRoutes from './routes/auth.js';
+import customerRoutes from './routes/customers-pg.js';
+import userRoutes from './routes/users.js';
+import productRoutes from './routes/products.js';
+import orderRoutes from './routes/orders.js';
+import productionRoutes from './routes/production.js';
+import rawMaterialRoutes from './routes/raw-materials.js';
+import invoiceRoutes from './routes/invoices.js';
+import reportRoutes from './routes/reports.js';
+import statsRoutes from './routes/stats.js';
 
-// Import middleware
-const { errorHandler } = require('./middlewares/errorHandler')
-const { authMiddleware } = require('./middlewares/auth')
+// Import middlewares
+import { errorHandler } from './middlewares/errorHandler.js';
+import { authMiddleware } from './middlewares/auth.js';
 
 // API routes
 app.get('/', (req, res) => {
@@ -154,7 +231,7 @@ app.get('/', (req, res) => {
     endpoints: {
       auth: '/api/auth',
       users: '/api/users',
-      customers: '/api/customers',
+      customers: '/api/customers-pg',
       products: '/api/products',
       orders: '/api/orders',
       production: '/api/production',
@@ -168,7 +245,7 @@ app.get('/', (req, res) => {
 
 app.use('/api/auth', authRoutes)
 app.use('/api/users', authMiddleware, userRoutes)
-app.use('/api/customers', authMiddleware, customerRoutes)
+app.use('/api/customers-pg', authMiddleware, customerRoutes)
 app.use('/api/products', authMiddleware, productRoutes)
 app.use('/api/orders', authMiddleware, orderRoutes)
 app.use('/api/production', authMiddleware, productionRoutes)
@@ -192,11 +269,27 @@ app.get('*', (req, res) => {
 app.use(errorHandler)
 
 // Start server
-if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
-  const server = app.listen(PORT, '0.0.0.0', () => {
+async function startServer() {
+  if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
+    console.log(`🔄 Starting server on port ${PORT}...`)
+    console.log('🔍 Debug: Server initialization started')
+    
+    // Add request logging middleware
+    app.use((req, res, next) => {
+      console.log(`📥 ${req.method} ${req.url}`)
+      next()
+    })
+
+    return new Promise((resolve, reject) => {
+      const server = app.listen(PORT, '127.0.0.1', (error) => {
+    if (error) {
+      console.error('❌ Failed to start server:', error)
+      process.exit(1)
+    }
     console.log(`🚀 Saft ERP API server running on port ${PORT}`)
     console.log(`📊 Environment: ${process.env.NODE_ENV}`)
-    console.log(`🔗 Health check: http://localhost:${PORT}/health`)
+    console.log(`🔗 Health check: http://127.0.0.1:${PORT}/health`)
+    console.log(`🌐 Listening on 127.0.0.1:${PORT}`)
   })
 
   // Handle server errors
@@ -210,21 +303,23 @@ if (process.env.NODE_ENV !== 'production' || !process.env.VERCEL) {
   })
 
   // Handle graceful shutdown
-  process.on('SIGTERM', () => {
-    console.log('🛑 SIGTERM received. Shutting down gracefully...')
-    server.close(() => {
-      console.log('✅ Server closed')
-      process.exit(0)
-    })
-  })
-
-  process.on('SIGINT', () => {
+    process.on('SIGINT', () => {
     console.log('🛑 SIGINT received. Shutting down gracefully...')
     server.close(() => {
       console.log('✅ Server closed')
       process.exit(0)
     })
   })
+  resolve(server);
+});
+  }
 }
 
-module.exports = app
+startServer()
+  .then(() => console.log('✅ Server started successfully'))
+  .catch(error => {
+    console.error('❌ Failed to start server:', error)
+    process.exit(1)
+  });
+
+export default app;
