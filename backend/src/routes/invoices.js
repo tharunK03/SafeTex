@@ -359,16 +359,17 @@ router.get('/:id/generate-pdf', async (req, res) => {
     // Send PDF file
     res.download(pdfResult.filepath, pdfResult.filename, (err) => {
       if (err) {
-        console.error('Error sending PDF:', err)
+        console.error('Error sending PDF:', { message: err.message, code: err.code, path: pdfResult.filepath })
         res.status(500).json({
           success: false,
-          error: 'Failed to send PDF'
+          error: 'Failed to send PDF',
+          details: err.message
         })
       }
     })
 
   } catch (error) {
-    console.error('Error generating PDF:', error)
+    console.error('Error generating PDF:', { message: error.message, stack: process.env.NODE_ENV==='development'?error.stack:undefined })
     const status = error.message?.startsWith('PDF_GENERATION_FAILED') ? 502 : 500
     res.status(status).json({
       success: false,
@@ -385,7 +386,14 @@ router.get('/:id/download', async (req, res) => {
     const { id } = req.params
 
     // Check if PDF already exists
-    const pdfPath = path.join(uploadsDir, `invoice-${id}.pdf`)
+    // id is DB id; fetch invoice to map to invoice_number for consistent filenames
+    const { data: invoiceMeta } = await supabase
+      .from('invoices')
+      .select('invoice_number')
+      .eq('id', id)
+      .single()
+    const filenameId = invoiceMeta?.invoice_number || id
+    const pdfPath = path.join(uploadsDir, `invoice-${filenameId}.pdf`)
     
     if (fs.existsSync(pdfPath)) {
       // Check if file has content

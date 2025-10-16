@@ -91,7 +91,9 @@ router.post('/', [
       console.error('Error creating customer:', error)
       return res.status(500).json({
         success: false,
-        error: 'Failed to create customer'
+        error: error.message || 'Failed to create customer',
+        code: error.code,
+        details: error.details || error.hint
       })
     }
     
@@ -160,7 +162,9 @@ router.put('/:id', [
       console.error('Error updating customer:', error)
       return res.status(500).json({
         success: false,
-        error: 'Failed to update customer'
+        error: error.message || 'Failed to update customer',
+        code: error.code,
+        details: error.details || error.hint
       })
     }
     
@@ -202,7 +206,9 @@ router.delete('/:id', async (req, res) => {
       console.error('Error deleting customer:', error)
       return res.status(500).json({
         success: false,
-        error: 'Failed to delete customer'
+        error: error.message || 'Failed to delete customer',
+        code: error.code,
+        details: error.details || error.hint
       })
     }
     
