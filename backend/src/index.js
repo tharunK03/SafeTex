@@ -281,15 +281,15 @@ async function startServer() {
     })
 
     return new Promise((resolve, reject) => {
-      const server = app.listen(PORT, '127.0.0.1', (error) => {
+      const server = app.listen(PORT, '0.0.0.0', (error) => {
     if (error) {
       console.error('❌ Failed to start server:', error)
       process.exit(1)
     }
     console.log(`🚀 Saft ERP API server running on port ${PORT}`)
     console.log(`📊 Environment: ${process.env.NODE_ENV}`)
-    console.log(`🔗 Health check: http://127.0.0.1:${PORT}/health`)
-    console.log(`🌐 Listening on 127.0.0.1:${PORT}`)
+    console.log(`🔗 Health check: http://0.0.0.0:${PORT}/health`)
+    console.log(`🌐 Listening on 0.0.0.0:${PORT}`)
   })
 
   // Handle server errors
