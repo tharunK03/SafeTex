@@ -30,12 +30,14 @@ services:
         value: 900000
       - key: RATE_LIMIT_MAX_REQUESTS
         value: 100
+      # Let Puppeteer download bundled Chromium during build
       - key: PUPPETEER_SKIP_DOWNLOAD
-        value: 'true'
+        value: 'false'
+      # Do not force a system Chrome path on Render free instances
       - key: PUPPETEER_EXECUTABLE_PATH
-        value: /usr/bin/google-chrome
+        value: ''
       - key: CHROME_BIN
-        value: /usr/bin/google-chrome
+        value: ''
       - key: PUPPETEER_USER_DATA_DIR
         value: /tmp/puppeteer_user_data
       - key: UPLOADS_DIR
